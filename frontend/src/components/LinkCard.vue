@@ -75,7 +75,7 @@ const props = defineProps({
 
 const emit = defineEmits(['edit', 'delete', 'showDetail'])
 
-const { displayFavicon, faviconError, fallbackLetter, fallbackColor } = useFavicon(props.link)
+const { displayFavicon, faviconError, fallbackLetter, fallbackColor } = useFavicon(() => props.link)
 
 const tooltipVisible = ref(false)
 const tooltipX = ref(0)

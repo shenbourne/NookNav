@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { fetchMeta, matchIconsFromSource, searchDashboardIcons, searchLobeIcons } = require('./services/meta-fetcher');
 const { DataStore } = require('./services/data-store');
+const { ImageStorage } = require('./services/image-storage');
 const {
   UnsafeUrlError,
   createRateLimiter,
@@ -22,8 +23,11 @@ const DATA_DIR = process.env.NAV_DATA_DIR
   ? path.resolve(process.env.NAV_DATA_DIR)
   : path.join(__dirname, 'data');
 const SAFE_LOGO_PATTERN = /^\/logo\.(png|jpe?g|gif|webp)$/i;
+const SAFE_IMAGE_PATTERN = /^\/(icons|gallery)\/[a-f0-9]{64}\.webp$/;
 
 const store = new DataStore(DATA_DIR);
+const imageStorage = new ImageStorage(store);
+imageStorage.start();
 
 if (!fs.existsSync(store.getUploadsDir())) {
   fs.mkdirSync(store.getUploadsDir(), { recursive: true });
@@ -78,7 +82,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(
   '/uploads',
   (req, res, next) => {
-    if (!SAFE_LOGO_PATTERN.test(req.path)) {
+    if (!SAFE_LOGO_PATTERN.test(req.path) && !SAFE_IMAGE_PATTERN.test(req.path)) {
       return res.status(404).end();
     }
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -237,7 +241,7 @@ app.put('/api/auth/username', authMiddleware, credentialLimiter, async (req, res
 
 app.get('/api/categories', (req, res) => {
   try {
-    const categories = store.getAllCategories();
+    const categories = store.getDisplayCategories();
     res.json({ success: true, data: categories });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -291,7 +295,7 @@ app.post('/api/categories', authMiddleware, (req, res) => {
   try {
     const { name, icon } = req.body;
     const cat = store.createCategory({ name, icon });
-    res.json({ success: true, data: cat });
+    res.json({ success: true, data: store.projectCategory(cat) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -301,7 +305,7 @@ app.put('/api/categories/:catId', authMiddleware, (req, res) => {
   try {
     const cat = store.updateCategory(req.params.catId, { name: req.body.name, icon: req.body.icon });
     if (!cat) return res.status(404).json({ success: false, error: 'Category not found' });
-    res.json({ success: true, data: cat });
+    res.json({ success: true, data: store.projectCategory(cat) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -324,7 +328,7 @@ app.post('/api/categories/:catId/subcategories', authMiddleware, (req, res) => {
     const { name, color } = req.body;
     const sub = store.createSubCategory(req.params.catId, { name, color });
     if (!sub) return res.status(404).json({ success: false, error: 'Category not found' });
-    res.json({ success: true, data: sub });
+    res.json({ success: true, data: store.projectSubCategory(sub) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -335,7 +339,7 @@ app.put('/api/categories/:catId/subcategories/:subId', authMiddleware, (req, res
     const { name, color } = req.body;
     const sub = store.updateSubCategory(req.params.catId, req.params.subId, { name, color });
     if (!sub) return res.status(404).json({ success: false, error: 'Sub-category not found' });
-    res.json({ success: true, data: sub });
+    res.json({ success: true, data: store.projectSubCategory(sub) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -362,7 +366,7 @@ app.post('/api/subcategories/move', authMiddleware, (req, res) => {
     }
     const sub = store.moveSubCategory(subId, fromCatId, toCatId);
     if (!sub) return res.status(404).json({ success: false, error: 'Not found' });
-    res.json({ success: true, data: sub });
+    res.json({ success: true, data: store.projectSubCategory(sub) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -374,7 +378,8 @@ app.post('/api/categories/:catId/subcategories/:subId/links', authMiddleware, (r
   try {
     const link = store.createLink(req.params.catId, req.params.subId, req.body);
     if (!link) return res.status(404).json({ success: false, error: 'Category or sub-category not found' });
-    res.json({ success: true, data: link });
+    imageStorage.start();
+    res.json({ success: true, data: store.projectLink(link) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -384,7 +389,8 @@ app.put('/api/categories/:catId/subcategories/:subId/links/:linkId', authMiddlew
   try {
     const link = store.updateLink(req.params.catId, req.params.subId, req.params.linkId, req.body);
     if (!link) return res.status(404).json({ success: false, error: 'Link not found' });
-    res.json({ success: true, data: link });
+    imageStorage.start();
+    res.json({ success: true, data: store.projectLink(link) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -395,7 +401,8 @@ app.post('/api/links/move', authMiddleware, (req, res) => {
     const { linkId, fromCatId, fromSubId, toCatId, toSubId, data: linkData } = req.body;
     const link = store.moveLink(linkId, fromCatId, fromSubId, toCatId, toSubId, linkData);
     if (!link) return res.status(404).json({ success: false, error: 'Not found' });
-    res.json({ success: true, data: link });
+    imageStorage.start();
+    res.json({ success: true, data: store.projectLink(link) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -425,7 +432,25 @@ app.get('/api/settings', (req, res) => {
 app.put('/api/settings', authMiddleware, (req, res) => {
   try {
     const settings = store.updateSettings(req.body);
+    imageStorage.start();
     res.json({ success: true, data: settings });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/settings/image-storage', authMiddleware, (req, res) => {
+  try {
+    res.json({ success: true, data: imageStorage.status() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/settings/image-storage/retry', authMiddleware, (req, res) => {
+  try {
+    imageStorage.start({ retry: true });
+    res.json({ success: true, data: imageStorage.status() });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -529,6 +554,10 @@ if (fs.existsSync(publicDir)) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Nav-site backend running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Nav-site backend running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = { app, store, imageStorage };

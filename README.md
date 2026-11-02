@@ -145,6 +145,18 @@ services:
 - Logo 上传按文件头识别真实类型，仅保留 PNG/JPEG/GIF/WebP，上传目录禁止执行主动内容；
 - Markdown、平台图标和自定义按钮 SVG 在渲染前统一做白名单净化。
 
+## 🖼️ 图片本地存储
+
+管理后台的「图片存储」提供两个独立开关：**图标本地存储默认开启，图片集本地存储默认关闭**。保存设置后，已有和后续新增、编辑的远程图片会在后台转换为 WebP；启动服务时也会补齐缺失副本。页面显示迁移进度、失败详情，并可重试失败图片。
+
+原网址始终保留，编辑链接时可通过网址栏末尾的无边框按钮打开原图。关闭策略后恢复原网址，本地副本继续保留，再次开启时直接复用。转换失败时继续使用原图，不影响链接保存。
+
+- 图标文件：`backend/data/uploads/icons/`，包含亮色和暗色图标，使用无损 WebP。旧有损缓存会在服务启动或迁移触发时从原网址重新生成，成功后自动切换。
+- 图片集文件：`backend/data/uploads/gallery/`。
+- 支持常见位图、SVG 和 ICO 输入；保留透明度及可解码的 GIF/WebP 动画。
+- 单图下载上限 10 MB，解码上限 4000 万像素；仅下载 HTTP(S) 公网地址。
+- Docker 沿用现有 `backend/data` 数据卷；备份时需同时保留 JSON 数据和 `uploads` 文件夹。
+
 ## 📝 链接数据结构
 
 链接对象包含以下字段：
@@ -203,6 +215,8 @@ services:
 | GET | `/api/settings` | 获取站点设置 | 否 |
 | PUT | `/api/settings` | 更新站点设置 | 是 |
 | POST | `/api/settings/logo` | 上传 Logo | 是 |
+| GET | `/api/settings/image-storage` | 查询图片本地存储进度 | 是 |
+| POST | `/api/settings/image-storage/retry` | 重试图片本地存储 | 是 |
 | POST | `/api/fetch-meta` | 抓取网页元数据 | 是 |
 | POST | `/api/auth/login` | 登录 | 否 |
 | PUT | `/api/auth/password` | 修改密码 | 是 |

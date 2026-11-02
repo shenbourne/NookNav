@@ -307,10 +307,13 @@ const changeUsernameModalVisible = ref(false)
 
 // --- Link Detail modal ---
 const linkDetailModalVisible = ref(false)
-const currentDetailLink = ref({ title: '', url: '' })
+const selectedDetailLink = ref({ title: '', url: '' })
+const currentDetailLink = computed(() =>
+  store.allLinks.find(link => link.id === selectedDetailLink.value.id) || selectedDetailLink.value
+)
 
 function handleShowDetail(link) {
-  currentDetailLink.value = link
+  selectedDetailLink.value = link
   linkDetailModalVisible.value = true
 }
 

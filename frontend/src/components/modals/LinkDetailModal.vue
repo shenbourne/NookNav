@@ -213,7 +213,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const { displayFavicon, faviconError, fallbackLetter, fallbackColor } = useFavicon(props.link)
+const { displayFavicon, faviconError, fallbackLetter, fallbackColor } = useFavicon(() => props.link)
 
 // 平台图标
 const platformIcons = {

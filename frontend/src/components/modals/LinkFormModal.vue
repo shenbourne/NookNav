@@ -93,6 +93,7 @@
           <div class="favicon-preview" v-if="form.favicon">
             <img :src="form.favicon" @error="($event.target.style.display = 'none')" />
           </div>
+          <OriginalImageLink :source="form.favicon" />
         </div>
         
         <!-- 暗色图标 -->
@@ -102,6 +103,7 @@
           <div class="favicon-preview" v-if="form.faviconDark">
             <img :src="form.faviconDark" @error="($event.target.style.display = 'none')" />
           </div>
+          <OriginalImageLink :source="form.faviconDark" />
         </div>
       </div>
 
@@ -134,8 +136,9 @@
               </div>
               <input
                 v-model="element.url"
-                type="url"
-                placeholder="https://example.com/image.png"
+                type="text"
+                aria-label="图片原始网址或相对路径"
+                placeholder="https://example.com/image.png 或 /uploads/..."
                 class="image-url-input"
               />
               <div class="image-preview" v-if="element.url">
@@ -148,6 +151,7 @@
               <button type="button" class="btn-remove-row" @click="removeImage(index)" title="移除">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
+              <OriginalImageLink :source="element.url" />
             </div>
           </template>
         </draggable>
@@ -262,6 +266,7 @@
 import { ref, watch, computed } from 'vue'
 import draggable from 'vuedraggable'
 import BaseModal from './BaseModal.vue'
+import OriginalImageLink from '../OriginalImageLink.vue'
 import SimpleIconPicker from './SimpleIconPicker.vue'
 import UnifiedIconPicker from './UnifiedIconPicker.vue'
 import { useNavStore } from '../../stores/navStore.js'
@@ -337,9 +342,9 @@ watch(
         title: props.link.title,
         description: props.link.description,
         platforms: props.link.platforms || [],
-        favicon: props.link.favicon || '',
-        faviconDark: props.link.faviconDark || '',
-        imageGallery: (props.link.imageGallery || []).map((url, index) => ({ id: 'img_' + index, url })),
+        favicon: props.link.imageSources?.favicon ?? props.link.favicon ?? '',
+        faviconDark: props.link.imageSources?.faviconDark ?? props.link.faviconDark ?? '',
+        imageGallery: (props.link.imageSources?.imageGallery ?? props.link.imageGallery ?? []).map((url, index) => ({ id: 'img_' + index, url })),
         detailDescription: props.link.detailDescription || '',
         categoryId: props.categoryId,
         subCategoryId: props.subCategoryId,
@@ -355,7 +360,8 @@ watch(
         form.value.subCategoryId = props.subCategoryId
       }
     }
-  }
+  },
+  { immediate: true }
 )
 
 async function autoFetch() {

@@ -155,6 +155,46 @@
           </div>
           </template>
         </section>
+        <section class="settings-group" aria-label="图片本地存储">
+          <h5 class="settings-group-title">图片本地存储</h5>
+          <div class="form-row">
+            <label class="form-label flex-label">
+              <span>图标本地存储</span>
+              <input type="checkbox" v-model="settingsForm.localIcons" class="toggle-checkbox" />
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+          <div class="form-row">
+            <label class="form-label flex-label">
+              <span>图片集本地存储</span>
+              <input type="checkbox" v-model="settingsForm.localGallery" class="toggle-checkbox" />
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+          <p class="form-hint">保存后，已有及新增图片将按各自开关自动转为 WebP 并保存在本地。关闭后立即恢复原网址，保留本地副本。</p>
+          <p v-if="navStore.imageStorageStatus" class="form-hint" role="status">
+            {{ navStore.imageStorageStatus.running ? '转换中' : '转换已结束' }}：
+            共 {{ navStore.imageStorageStatus.total }} 项，
+            成功 {{ navStore.imageStorageStatus.completed }} 项，
+            失败 {{ navStore.imageStorageStatus.failed }} 项
+          </p>
+          <div v-if="navStore.imageStorageStatus?.errors?.length">
+            <details>
+              <summary class="form-hint">查看失败详情</summary>
+              <ul class="storage-errors">
+                <li v-for="(item, index) in navStore.imageStorageStatus.errors" :key="index">
+                  {{ item.kind }} · {{ item.source }}：{{ item.error }}
+                </li>
+              </ul>
+            </details>
+          </div>
+          <p v-if="storageError" class="settings-msg error" role="alert">{{ storageError }}</p>
+          <button v-if="navStore.imageStorageStatus?.failed || storageError" type="button"
+            class="user-action-btn" :disabled="storageRetrying || navStore.imageStorageStatus?.running"
+            @click="retryStorage">
+            {{ storageRetrying ? '重试中...' : '重试图片存储' }}
+          </button>
+        </section>
         <section class="settings-group" aria-label="资源加速">
           <h5 class="settings-group-title">资源加速</h5>
           <div class="form-row">
@@ -289,7 +329,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import draggable from 'vuedraggable'
 import BaseModal from './BaseModal.vue'
 import { useNavStore } from '../../stores/navStore.js'
@@ -384,6 +424,8 @@ const settingsForm = ref({
   title: '',
   logoUrl: '',
   githubJsdelivr: false,
+  localIcons: true,
+  localGallery: false,
   galleryAutoPlay: true,
   galleryAutoPlayInterval: 5,
   galleryTransition: 'fade',
@@ -397,6 +439,52 @@ const logoFile = ref(null)
 const settingsLoading = ref(false)
 const settingsError = ref('')
 const settingsSuccess = ref('')
+
+const storageError = ref('')
+const storageRetrying = ref(false)
+let storageTimer = null
+let storageGeneration = 0
+
+function stopStoragePolling() {
+  storageGeneration++
+  clearTimeout(storageTimer)
+  storageTimer = null
+}
+
+function startStoragePolling() {
+  stopStoragePolling()
+  const generation = storageGeneration
+  async function tick() {
+    if (!props.visible || generation !== storageGeneration) return
+    try {
+      const status = await navStore.fetchImageStorageStatus()
+      if (!status) return // Logged out.
+      storageError.value = ''
+    } catch (err) {
+      storageError.value = err.response?.data?.error || '无法获取图片存储状态'
+      return // Avoid repeatedly querying an unavailable or unauthorized endpoint.
+    }
+    if (props.visible && generation === storageGeneration) {
+      storageTimer = setTimeout(tick, 2000)
+    }
+  }
+  void tick()
+}
+
+async function retryStorage() {
+  storageRetrying.value = true
+  storageError.value = ''
+  try {
+    await navStore.retryImageStorage()
+    if (props.visible) startStoragePolling()
+  } catch (err) {
+    storageError.value = err.response?.data?.error || '重试失败，请稍后再试'
+  } finally {
+    storageRetrying.value = false
+  }
+}
+
+onUnmounted(stopStoragePolling)
 
 const currentLogoPreview = computed(() => {
   if (logoInputMode.value === 'upload' && logoFile.value) {
@@ -430,6 +518,8 @@ async function handleSaveSettings() {
     await navStore.updateSettings({
       title: settingsForm.value.title,
       githubJsdelivr: settingsForm.value.githubJsdelivr,
+      localIcons: settingsForm.value.localIcons,
+      localGallery: settingsForm.value.localGallery,
       galleryAutoPlay: settingsForm.value.galleryAutoPlay,
       galleryAutoPlayInterval: (settingsForm.value.galleryAutoPlayInterval || 5) * 1000,
       galleryTransition: settingsForm.value.galleryTransition,
@@ -465,6 +555,8 @@ watch(
         title: navStore.siteSettings.title || '',
         logoUrl: navStore.siteSettings.logoUrl || '',
         githubJsdelivr: navStore.siteSettings.githubJsdelivr || false,
+        localIcons: navStore.siteSettings.localIcons !== false,
+        localGallery: navStore.siteSettings.localGallery === true,
         galleryAutoPlay: navStore.siteSettings.galleryAutoPlay !== false,
         galleryAutoPlayInterval: (navStore.siteSettings.galleryAutoPlayInterval || 5000) / 1000,
         galleryTransition: navStore.siteSettings.galleryTransition || 'fade',
@@ -476,12 +568,24 @@ watch(
       logoFile.value = null
       settingsError.value = ''
       settingsSuccess.value = ''
+      storageError.value = ''
+      startStoragePolling()
+    } else {
+      stopStoragePolling()
     }
-  }
+  },
+  { immediate: true }
 )
 </script>
 
 <style scoped>
+.storage-errors {
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
 .gallery-mode-switch {
   display: inline-flex;
   max-width: 100%;

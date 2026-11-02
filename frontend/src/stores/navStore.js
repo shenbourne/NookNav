@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onScopeDispose } from 'vue'
+import { useAuthStore } from './authStore.js'
 import api from '../composables/useApi.js'
 
 export const useNavStore = defineStore('nav', () => {
@@ -11,6 +12,8 @@ export const useNavStore = defineStore('nav', () => {
     title: 'My Nav 的主页',
     logoUrl: '',
     githubJsdelivr: false,
+    localIcons: true,
+    localGallery: false,
     galleryAutoPlay: true,
     galleryAutoPlayInterval: 5000,
     galleryTransition: 'fade',
@@ -18,6 +21,96 @@ export const useNavStore = defineStore('nav', () => {
     galleryMasonryScrollSpeed: 20,
     galleryDefaultMode: 'carousel',
     galleryCarouselTimeout: 10000,
+  })
+
+  const authStore = useAuthStore()
+  const imageStorageStatus = ref(null)
+  let statusRequest = null
+  let appliedRevision = null
+  let migrationTimer = null
+  let migrationGeneration = 0
+  let disposed = false
+
+  async function refreshCategories() {
+    const { data: res } = await api.get('/categories')
+    if (!res.success) throw new Error(res.error || '无法刷新分类')
+    categories.value = res.data
+  }
+
+  async function applyImageStorageStatus(status) {
+    if (!authStore.isLoggedIn || disposed) return null
+    imageStorageStatus.value = status
+    if (status.revision !== appliedRevision) {
+      await refreshCategories()
+      appliedRevision = status.revision
+    }
+    return status
+  }
+
+  async function fetchImageStorageStatus() {
+    if (!authStore.isLoggedIn || disposed) return null
+    if (statusRequest) return statusRequest
+    statusRequest = (async () => {
+      const { data: res } = await api.get('/settings/image-storage')
+      if (!res.success) throw new Error(res.error || '无法获取图片存储状态')
+      return applyImageStorageStatus(res.data)
+    })()
+    try {
+      return await statusRequest
+    } finally {
+      statusRequest = null
+    }
+  }
+
+  async function retryImageStorage() {
+    if (!authStore.isLoggedIn || disposed) return null
+    const { data: res } = await api.post('/settings/image-storage/retry')
+    if (!res.success) throw new Error(res.error || '重试失败')
+    const status = await applyImageStorageStatus(res.data)
+    startImageStoragePolling()
+    return status
+  }
+
+  function stopImageStoragePolling() {
+    migrationGeneration++
+    clearTimeout(migrationTimer)
+    migrationTimer = null
+  }
+
+  // Briefly follow queued work after loads/mutations, even outside the admin modal.
+  // Stop after idle confirmation or five minutes; never poll as an anonymous visitor.
+  function startImageStoragePolling() {
+    stopImageStoragePolling()
+    if (!authStore.isLoggedIn || disposed) return
+    const generation = migrationGeneration
+    const deadline = Date.now() + 5 * 60 * 1000
+    let idleChecks = 0
+    async function tick() {
+      if (generation !== migrationGeneration || !authStore.isLoggedIn || disposed) return
+      try {
+        const status = await fetchImageStorageStatus()
+        if (!status) return
+        idleChecks = status.running ? 0 : idleChecks + 1
+      } catch {
+        return // A later load or mutation can try again.
+      }
+      if (generation !== migrationGeneration || !authStore.isLoggedIn || disposed) return
+      if (Date.now() < deadline && idleChecks < 3) migrationTimer = setTimeout(tick, 2000)
+    }
+    migrationTimer = setTimeout(tick, 500)
+  }
+
+  watch(() => authStore.isLoggedIn, (loggedIn) => {
+    if (loggedIn) startImageStoragePolling()
+    else {
+      stopImageStoragePolling()
+      imageStorageStatus.value = null
+      appliedRevision = null
+    }
+  }, { flush: 'sync' })
+  onScopeDispose(() => {
+    disposed = true
+    stopImageStoragePolling()
   })
 
   // Get all links across all categories for "全部" tab
@@ -69,10 +162,11 @@ export const useNavStore = defineStore('nav', () => {
         }
       }
       if (settingsRes.data.success) {
-        siteSettings.value = settingsRes.data.data
+        siteSettings.value = { localIcons: true, localGallery: false, ...settingsRes.data.data }
       }
     } finally {
       loading.value = false
+      startImageStoragePolling()
     }
   }
 
@@ -142,6 +236,7 @@ export const useNavStore = defineStore('nav', () => {
   async function moveSubCategory(subId, fromCatId, toCatId) {
     const { data: res } = await api.post('/subcategories/move', { subId, fromCatId, toCatId })
     if (res.success) {
+      startImageStoragePolling()
       const fromCat = categories.value.find(c => c.id === fromCatId)
       if (fromCat && fromCat.subCategories) {
         fromCat.subCategories = fromCat.subCategories.filter(s => s.id !== subId)
@@ -159,6 +254,7 @@ export const useNavStore = defineStore('nav', () => {
   async function addLink(catId, subId, payload) {
     const { data: res } = await api.post(`/categories/${catId}/subcategories/${subId}/links`, payload)
     if (res.success) {
+      startImageStoragePolling()
       const cat = categories.value.find(c => c.id === catId)
       if (cat && cat.subCategories) {
         const sub = cat.subCategories.find(s => s.id === subId)
@@ -171,6 +267,7 @@ export const useNavStore = defineStore('nav', () => {
   async function updateLink(catId, subId, linkId, payload) {
     const { data: res } = await api.put(`/categories/${catId}/subcategories/${subId}/links/${linkId}`, payload)
     if (res.success) {
+      startImageStoragePolling()
       const cat = categories.value.find(c => c.id === catId)
       if (cat && cat.subCategories) {
         const sub = cat.subCategories.find(s => s.id === subId)
@@ -187,6 +284,7 @@ export const useNavStore = defineStore('nav', () => {
       linkId, fromCatId, fromSubId, toCatId, toSubId, data: payload,
     })
     if (res.success) {
+      startImageStoragePolling()
       // Remove from source
       const fromCat = categories.value.find(c => c.id === fromCatId)
       if (fromCat && fromCat.subCategories) {
@@ -238,7 +336,9 @@ export const useNavStore = defineStore('nav', () => {
   async function updateSettings(payload) {
     const { data: res } = await api.put('/settings', payload)
     if (res.success) {
-      siteSettings.value = res.data
+      siteSettings.value = { localIcons: true, localGallery: false, ...res.data }
+      await refreshCategories()
+      startImageStoragePolling()
     }
   }
 
@@ -310,6 +410,9 @@ export const useNavStore = defineStore('nav', () => {
     activeTabId,
     searchQuery,
     siteSettings,
+    imageStorageStatus,
+    fetchImageStorageStatus,
+    retryImageStorage,
     allLinks,
     filteredLinks,
     fetchAll,

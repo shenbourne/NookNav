@@ -207,6 +207,90 @@ class DataStore {
     return data.categories;
   }
 
+  getImageCache() {
+    return this.#readData().imageCache || { icons: {}, gallery: {} };
+  }
+
+  setCachedImage(kind, source, localUrl) {
+    if (!['icons', 'gallery'].includes(kind)
+      || typeof source !== 'string'
+      || !new RegExp(`^/uploads/${kind}/[a-f0-9]{64}\\.webp$`).test(localUrl)) {
+      throw new Error('无效的本地图片映射');
+    }
+    const data = this.#readData();
+    data.imageCache ||= { icons: {}, gallery: {} };
+    data.imageCache[kind] ||= {};
+    // Read fresh data per update: a background download must never overwrite edits.
+    data.imageCache[kind][source] = localUrl;
+    this.#writeData(data);
+  }
+
+  getCachedImage(kind, source, cache = this.getImageCache()) {
+    if (!['icons', 'gallery'].includes(kind)) return null;
+    const localUrl = cache[kind]?.[source];
+    if (typeof localUrl !== 'string'
+      || !new RegExp(`^/uploads/${kind}/[a-f0-9]{64}\\.webp$`).test(localUrl)) return null;
+    return fs.existsSync(path.join(this.UPLOADS_DIR, localUrl.slice('/uploads/'.length)))
+      ? localUrl : null;
+  }
+
+  getImageSources() {
+    const result = new Map();
+    const settings = this.getSettings();
+    const add = (kind, source) => {
+      if (typeof source === 'string' && /^https?:\/\//i.test(source)) {
+        result.set(`${kind}:${source}`, { kind, source });
+      }
+    };
+    for (const cat of this.getAllCategories()) {
+      for (const sub of cat.subCategories || []) {
+        for (const link of sub.links || []) {
+          if (settings.localIcons) {
+            add('icons', link.favicon);
+            add('icons', link.faviconDark);
+          }
+          if (settings.localGallery) {
+            for (const source of link.imageGallery || []) add('gallery', source);
+          }
+        }
+      }
+    }
+    return [...result.values()];
+  }
+
+  projectLink(link, settings = this.getSettings(), cache = this.getImageCache()) {
+    const resolve = (kind, source, enabled) => enabled
+      ? this.getCachedImage(kind, source, cache) || source : source;
+    return {
+      ...link,
+      imageSources: {
+        favicon: link.favicon || '',
+        faviconDark: link.faviconDark || '',
+        imageGallery: [...(link.imageGallery || [])],
+      },
+      favicon: resolve('icons', link.favicon || '', settings.localIcons),
+      faviconDark: resolve('icons', link.faviconDark || '', settings.localIcons),
+      imageGallery: (link.imageGallery || []).map(source => resolve('gallery', source, settings.localGallery)),
+    };
+  }
+
+  getDisplayCategories() {
+    const settings = this.getSettings();
+    const cache = this.getImageCache();
+    return this.getAllCategories().map(cat => this.projectCategory(cat, settings, cache));
+  }
+
+  projectSubCategory(sub, settings = this.getSettings(), cache = this.getImageCache()) {
+    return { ...sub, links: (sub.links || []).map(link => this.projectLink(link, settings, cache)) };
+  }
+
+  projectCategory(cat, settings = this.getSettings(), cache = this.getImageCache()) {
+    return {
+      ...cat,
+      subCategories: (cat.subCategories || []).map(sub => this.projectSubCategory(sub, settings, cache)),
+    };
+  }
+
   createCategory({ name, icon }) {
     const data = this.#readData();
     const cat = {
@@ -464,6 +548,8 @@ class DataStore {
     title: 'My Nav 的主页',
     logoUrl: '',
     githubJsdelivr: false,
+    localIcons: true,
+    localGallery: false,
     galleryAutoPlay: true,
     galleryAutoPlayInterval: 5000,
     galleryTransition: 'fade',
@@ -482,14 +568,14 @@ class DataStore {
     const data = this.#readData();
     if (!data.siteSettings) data.siteSettings = { ...DataStore.DEFAULT_SETTINGS };
     const s = data.siteSettings;
-    const fields = ['title', 'logoUrl', 'githubJsdelivr', 'galleryAutoPlay',
+    const fields = ['title', 'logoUrl', 'githubJsdelivr', 'localIcons', 'localGallery', 'galleryAutoPlay',
       'galleryAutoPlayInterval', 'galleryTransition', 'galleryMasonryAutoScroll',
       'galleryMasonryScrollSpeed', 'galleryDefaultMode', 'galleryCarouselTimeout'];
     for (const f of fields) {
       if (payload[f] !== undefined) {
         if (f === 'galleryAutoPlayInterval' || f === 'galleryMasonryScrollSpeed' || f === 'galleryCarouselTimeout') {
           s[f] = Number(payload[f]) || 0;
-        } else if (f === 'githubJsdelivr' || f === 'galleryAutoPlay' || f === 'galleryMasonryAutoScroll') {
+        } else if (f === 'githubJsdelivr' || f === 'localIcons' || f === 'localGallery' || f === 'galleryAutoPlay' || f === 'galleryMasonryAutoScroll') {
           s[f] = !!payload[f];
         } else {
           s[f] = payload[f];
@@ -497,7 +583,7 @@ class DataStore {
       }
     }
     this.#writeData(data);
-    return s;
+    return { ...DataStore.DEFAULT_SETTINGS, ...s };
   }
 
   updateLogoUrl(logoUrl) {

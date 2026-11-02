@@ -211,7 +211,11 @@ async function resolveSafeUrl(rawUrl) {
  * - 用 lookup 钩子把连接固定在校验过的 IP 上，避免 DNS rebinding；
  * - 手动跟随重定向，最多 maxRedirects 次。
  */
-async function safeGet(rawUrl, { timeout = 8000, headers = {}, maxRedirects = 5 } = {}) {
+async function safeGet(rawUrl, {
+  timeout = 8000, headers = {}, maxRedirects = 5,
+  responseType = 'text', maxContentLength = 2 * 1024 * 1024,
+  allowedContentTypes = /^(text\/html|application\/xhtml\+xml|text\/plain|application\/xml)/,
+} = {}) {
   let currentUrl = rawUrl;
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -220,8 +224,8 @@ async function safeGet(rawUrl, { timeout = 8000, headers = {}, maxRedirects = 5 
     const response = await axios.get(url.href, {
       timeout,
       headers,
-      responseType: 'text',
-      maxContentLength: 2 * 1024 * 1024,
+      responseType,
+      maxContentLength,
       maxRedirects: 0,
       proxy: false,
       validateStatus: () => true,
@@ -239,7 +243,7 @@ async function safeGet(rawUrl, { timeout = 8000, headers = {}, maxRedirects = 5 
       currentUrl = new URL(location, url).href;
       continue;
     }
-    if (response.status >= 400) {
+    if (response.status < 200 || response.status >= 300) {
       const err = new Error(`目标站点返回 ${response.status}`);
       err.statusCode = response.status;
       throw err;
@@ -248,9 +252,9 @@ async function safeGet(rawUrl, { timeout = 8000, headers = {}, maxRedirects = 5 
     const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
     if (
       contentType
-      && !/^(text\/html|application\/xhtml\+xml|text\/plain|application\/xml)/.test(contentType)
+      && !allowedContentTypes.test(contentType)
     ) {
-      throw new UnsafeUrlError('目标地址不是可解析的网页');
+      throw new UnsafeUrlError(responseType === 'text' ? '目标地址不是可解析的网页' : '目标地址不是图片');
     }
     return response;
   }
