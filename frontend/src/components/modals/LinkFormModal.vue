@@ -77,6 +77,11 @@
       <div class="form-group">
         <div class="favicon-header">
           <label>图标网址</label>
+          <div class="favicon-scale">
+            <input v-model.number="form.iconScale" type="range" min="50" max="200" step="5"
+              aria-label="图标缩放比例" :aria-valuetext="`${form.iconScale}%`" />
+            <output>{{ form.iconScale }}%</output>
+          </div>
           <button
             type="button"
             class="btn btn-unified-icon"
@@ -86,24 +91,33 @@
           </button>
         </div>
         
-        <!-- 亮色图标 -->
-        <div class="favicon-row">
-          <span class="favicon-label">亮色</span>
-          <input v-model="form.favicon" type="text" placeholder="亮色主题图标 URL" />
-          <div class="favicon-preview" v-if="form.favicon">
-            <img :src="form.favicon" @error="($event.target.style.display = 'none')" />
+        <div class="favicon-layout" :style="{ '--icon-scale': form.iconScale / 100 }">
+          <div class="favicon-preview favicon-preview-light" aria-label="亮色图标预览">
+            <img v-if="form.favicon" :key="form.favicon" :src="form.favicon" alt="亮色图标"
+              @error="($event.target.style.display = 'none')" />
+            <span v-else>亮色<br />图标</span>
           </div>
-          <OriginalImageLink :source="imageSourceUrl(form.favicon, form.imageOrigins.favicon)" />
-        </div>
-        
-        <!-- 暗色图标 -->
-        <div class="favicon-row">
-          <span class="favicon-label">暗色</span>
-          <input v-model="form.faviconDark" type="text" placeholder="暗色主题图标 URL（可选）" />
-          <div class="favicon-preview" v-if="form.faviconDark">
-            <img :src="form.faviconDark" @error="($event.target.style.display = 'none')" />
+          <div class="favicon-fields">
+            <div class="favicon-row">
+              <label for="link-favicon-light" class="favicon-label">亮色</label>
+              <div class="favicon-input">
+                <input id="link-favicon-light" v-model="form.favicon" type="text" placeholder="亮色主题图标 URL" />
+                <OriginalImageLink :source="imageSourceUrl(form.favicon, form.imageOrigins.favicon)" />
+              </div>
+            </div>
+            <div class="favicon-row favicon-row-dark">
+              <div class="favicon-input">
+                <OriginalImageLink :source="imageSourceUrl(form.faviconDark, form.imageOrigins.faviconDark)" />
+                <input id="link-favicon-dark" v-model="form.faviconDark" type="text" placeholder="暗色主题图标 URL（可选）" />
+              </div>
+              <label for="link-favicon-dark" class="favicon-label">暗色</label>
+            </div>
           </div>
-          <OriginalImageLink :source="imageSourceUrl(form.faviconDark, form.imageOrigins.faviconDark)" />
+          <div class="favicon-preview favicon-preview-dark" aria-label="暗色图标预览">
+            <img v-if="form.faviconDark" :key="form.faviconDark" :src="form.faviconDark" alt="暗色图标"
+              @error="($event.target.style.display = 'none')" />
+            <span v-else>暗色<br />图标</span>
+          </div>
         </div>
       </div>
 
@@ -444,6 +458,7 @@ function handleSubmit() {
       title: form.value.title,
       description: form.value.description,
       platforms: form.value.platforms,
+      iconScale: form.value.iconScale,
       favicon: imageSourceUrl(form.value.favicon, form.value.imageOrigins.favicon),
       faviconDark: imageSourceUrl(form.value.faviconDark, form.value.imageOrigins.faviconDark),
       imageGallery: form.value.imageGallery.map(img => imageSourceUrl(img.url, img.origin)).filter(url => url && url.trim()),
@@ -575,6 +590,7 @@ function handleSubmit() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -582,33 +598,68 @@ function handleSubmit() {
   margin-bottom: 0;
 }
 
-.favicon-actions {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.favicon-row {
+.favicon-scale {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.favicon-row:last-child {
-  margin-bottom: 0;
-}
-
-.favicon-label {
-  width: 36px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.favicon-row input {
+  gap: 6px;
   flex: 1;
+  min-width: 0;
+  max-width: 180px;
+}
+
+.form-group .favicon-scale input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.favicon-scale output {
+  min-width: 30px;
+  font-size: 11px;
+  color: var(--color-text-hint);
+  white-space: nowrap;
+}
+
+.favicon-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.favicon-fields {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.favicon-row,
+.favicon-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.favicon-input {
+  flex: 1;
+}
+
+.form-group .favicon-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+
+.favicon-input input {
+  flex: 1;
+  min-width: 0;
 }
 
 .spinner-small {
@@ -633,32 +684,71 @@ function handleSubmit() {
   to { transform: rotate(360deg); }
 }
 
-.favicon-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.favicon-row input {
-  flex: 1;
-}
-
 .favicon-preview {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  border-radius: 8px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
   overflow: hidden;
   background: var(--bg-section);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--color-text-hint);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .favicon-preview img {
-  width: 28px;
-  height: 28px;
+  transform: scale(var(--icon-scale, 1));
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
+}
+
+@media (max-width: 480px) {
+  .favicon-layout {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .favicon-row,
+  .favicon-input {
+    gap: 4px;
+  }
+
+  .favicon-input input {
+    padding: 10px 8px;
+  }
+
+  .favicon-header {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .favicon-header > label {
+    flex-shrink: 0;
+  }
+
+  .favicon-scale {
+    max-width: none;
+  }
+
+  .favicon-header .btn-unified-icon {
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+
+  .favicon-preview {
+    width: 44px;
+    height: 44px;
+  }
+
+  .favicon-preview img {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 /* 支持平台复选框样式 */

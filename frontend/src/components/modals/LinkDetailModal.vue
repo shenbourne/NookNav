@@ -7,6 +7,7 @@
           <img
             v-if="displayFavicon && !faviconError"
             :src="displayFavicon"
+            :style="iconStyle"
             :alt="link.title"
             @error="faviconError = true"
           />
@@ -213,7 +214,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const { displayFavicon, faviconError, fallbackLetter, fallbackColor } = useFavicon(() => props.link)
+const { displayFavicon, iconStyle, faviconError, fallbackLetter, fallbackColor } = useFavicon(() => props.link)
 
 // 平台图标
 const platformIcons = {

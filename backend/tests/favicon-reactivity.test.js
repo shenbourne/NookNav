@@ -22,3 +22,17 @@ it('updates mounted favicon and clears failed-load state when migration replaces
   await nextTick();
   expect(icon.displayFavicon.value).toBe('https://example.com/source.png');
 });
+
+it('reacts to saved icon scaling while leaving the image URL unchanged', async () => {
+  const props = reactive({ link: { favicon: 'https://example.com/icon.png' } });
+  scope = effectScope();
+  const icon = scope.run(() => useFavicon(() => props.link));
+  expect(icon.iconStyle.value.transform).toBe('scale(1)');
+  props.link.iconScale = 180;
+  await nextTick();
+  expect(icon.iconStyle.value.transform).toBe('scale(1.8)');
+  expect(icon.displayFavicon.value).toBe('https://example.com/icon.png');
+  props.link = { favicon: 'https://example.com/other.png', iconScale: 50 };
+  await nextTick();
+  expect(icon.iconStyle.value.transform).toBe('scale(0.5)');
+});

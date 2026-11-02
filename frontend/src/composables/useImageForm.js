@@ -7,6 +7,7 @@ export function createImageFields(link = {}) {
   const favicon = link.favicon || ''
   const faviconDark = link.faviconDark || ''
   return {
+    iconScale: Math.min(200, Math.max(50, Number(link.iconScale) || 100)),
     favicon,
     faviconDark,
     imageOrigins: {

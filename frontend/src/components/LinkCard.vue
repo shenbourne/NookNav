@@ -4,6 +4,7 @@
       <img
         v-if="!faviconError"
         :src="displayFavicon"
+        :style="iconStyle"
         :alt="link.title"
         @error="faviconError = true"
         class="favicon-img"
@@ -75,7 +76,7 @@ const props = defineProps({
 
 const emit = defineEmits(['edit', 'delete', 'showDetail'])
 
-const { displayFavicon, faviconError, fallbackLetter, fallbackColor } = useFavicon(() => props.link)
+const { displayFavicon, iconStyle, faviconError, fallbackLetter, fallbackColor } = useFavicon(() => props.link)
 
 const tooltipVisible = ref(false)
 const tooltipX = ref(0)

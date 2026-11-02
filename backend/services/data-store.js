@@ -419,6 +419,7 @@ class DataStore {
       description: payload.description || '',
       favicon: payload.favicon || '',
       faviconDark: payload.faviconDark || '',
+      iconScale: Math.min(200, Math.max(50, Number(payload.iconScale) || 100)),
       order: payload.order ?? 0,
       platforms: payload.platforms || [],
       imageGallery: (payload.imageGallery || []).filter(img => img && img.trim()),
@@ -439,7 +440,7 @@ class DataStore {
 
   #applyLinkUpdates(link, payload) {
     const fields = ['title', 'url', 'description', 'favicon', 'faviconDark',
-      'platforms', 'imageGallery', 'detailDescription', 'customButtons'];
+      'platforms', 'imageGallery', 'detailDescription', 'customButtons', 'iconScale'];
     for (const f of fields) {
       if (payload[f] === undefined) continue;
       if (f === 'imageGallery') {
@@ -458,6 +459,8 @@ class DataStore {
             iconBrandColor: btn.iconBrandColor,
             icon: btn.icon,
           }));
+      } else if (f === 'iconScale') {
+        link[f] = Math.min(200, Math.max(50, Number(payload[f]) || 100));
       } else if (f === 'faviconDark') {
         link[f] = payload[f] || '';
       } else {

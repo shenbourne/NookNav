@@ -13,6 +13,9 @@ export function useFavicon(link) {
   const uiStore = useUiStore()
   const navStore = useNavStore()
   const faviconError = ref(false)
+  const iconStyle = computed(() => ({
+    transform: `scale(${Math.min(200, Math.max(50, Number(toValue(link)?.iconScale) || 100)) / 100})`,
+  }))
 
   const displayFavicon = computed(() => {
     const currentLink = toValue(link) || {}
@@ -54,6 +57,7 @@ export function useFavicon(link) {
 
   return {
     displayFavicon,
+    iconStyle,
     faviconError,
     fallbackLetter,
     fallbackColor,
