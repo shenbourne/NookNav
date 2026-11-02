@@ -93,7 +93,7 @@
           <div class="favicon-preview" v-if="form.favicon">
             <img :src="form.favicon" @error="($event.target.style.display = 'none')" />
           </div>
-          <OriginalImageLink :source="form.favicon" />
+          <OriginalImageLink :source="imageSourceUrl(form.favicon, form.imageOrigins.favicon)" />
         </div>
         
         <!-- 暗色图标 -->
@@ -103,7 +103,7 @@
           <div class="favicon-preview" v-if="form.faviconDark">
             <img :src="form.faviconDark" @error="($event.target.style.display = 'none')" />
           </div>
-          <OriginalImageLink :source="form.faviconDark" />
+          <OriginalImageLink :source="imageSourceUrl(form.faviconDark, form.imageOrigins.faviconDark)" />
         </div>
       </div>
 
@@ -137,7 +137,7 @@
               <input
                 v-model="element.url"
                 type="text"
-                aria-label="图片原始网址或相对路径"
+                aria-label="图片网址或本地相对路径"
                 placeholder="https://example.com/image.png 或 /uploads/..."
                 class="image-url-input"
               />
@@ -151,7 +151,7 @@
               <button type="button" class="btn-remove-row" @click="removeImage(index)" title="移除">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
-              <OriginalImageLink :source="element.url" />
+              <OriginalImageLink :source="imageSourceUrl(element.url, element.origin)" />
             </div>
           </template>
         </draggable>
@@ -271,6 +271,7 @@ import SimpleIconPicker from './SimpleIconPicker.vue'
 import UnifiedIconPicker from './UnifiedIconPicker.vue'
 import { useNavStore } from '../../stores/navStore.js'
 import { sanitizeSvg } from '../../composables/useSanitize.js'
+import { createImageFields, imageSourceUrl } from '../../composables/useImageForm.js'
 
 const props = defineProps({
   visible: Boolean,
@@ -307,9 +308,7 @@ function getDefaultForm() {
     title: '',
     description: '',
     platforms: [],
-    favicon: '',        // 亮色主题图标
-    faviconDark: '',    // 暗色主题图标（可选）
-    imageGallery: [],
+    ...createImageFields(),
     detailDescription: '',
     categoryId: '',
     subCategoryId: '',
@@ -342,9 +341,7 @@ watch(
         title: props.link.title,
         description: props.link.description,
         platforms: props.link.platforms || [],
-        favicon: props.link.imageSources?.favicon ?? props.link.favicon ?? '',
-        faviconDark: props.link.imageSources?.faviconDark ?? props.link.faviconDark ?? '',
-        imageGallery: (props.link.imageSources?.imageGallery ?? props.link.imageGallery ?? []).map((url, index) => ({ id: 'img_' + index, url })),
+        ...createImageFields(props.link),
         detailDescription: props.link.detailDescription || '',
         categoryId: props.categoryId,
         subCategoryId: props.subCategoryId,
@@ -447,9 +444,9 @@ function handleSubmit() {
       title: form.value.title,
       description: form.value.description,
       platforms: form.value.platforms,
-      favicon: form.value.favicon,
-      faviconDark: form.value.faviconDark,
-      imageGallery: form.value.imageGallery.map(img => img.url).filter(url => url && url.trim()),
+      favicon: imageSourceUrl(form.value.favicon, form.value.imageOrigins.favicon),
+      faviconDark: imageSourceUrl(form.value.faviconDark, form.value.imageOrigins.faviconDark),
+      imageGallery: form.value.imageGallery.map(img => imageSourceUrl(img.url, img.origin)).filter(url => url && url.trim()),
       detailDescription: form.value.detailDescription,
       customButtons: form.value.customButtons
         .filter(b => (b.label || b.iconSvg || b.icon) && b.url)
