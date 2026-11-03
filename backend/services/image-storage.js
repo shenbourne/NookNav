@@ -60,7 +60,7 @@ async function downloadImage(source) {
     maxContentLength: MAX_BYTES,
     timeout: 12000,
     allowedContentTypes: /^(image\/[^;]+|application\/octet-stream)(?:;|$)/i,
-    headers: { Accept: 'image/*', 'User-Agent': 'NavSite/1.0' },
+    headers: { Accept: 'image/*', 'User-Agent': 'NookNav/1.0' },
   });
   return Buffer.from(response.data);
 }

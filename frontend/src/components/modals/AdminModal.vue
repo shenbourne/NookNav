@@ -214,6 +214,8 @@
       </div>
     </div>
 
+    <AppAbout v-if="visible" />
+
     <div class="admin-section">
       <h4>一级分类管理</h4>
       <draggable
@@ -332,6 +334,7 @@
 import { ref, watch, computed, onUnmounted } from 'vue'
 import draggable from 'vuedraggable'
 import BaseModal from './BaseModal.vue'
+import AppAbout from '../AppAbout.vue'
 import { useNavStore } from '../../stores/navStore.js'
 
 const navStore = useNavStore()

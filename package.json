@@ -1,13 +1,25 @@
 {
-  "name": "nav-site",
+  "name": "nooknav",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
     "build": "cd frontend && npm run build",
-    "start": "cd backend && npm start"
+    "start": "cd backend && npm start",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "eslint": "^9.21.0",
+    "eslint-plugin-vue": "^9.32.0",
+    "prettier": "^3.5.2"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.5",
+    "globals": "^17.9.0",
+    "vue-eslint-parser": "^10.4.1"
   }
 }

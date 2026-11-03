@@ -380,7 +380,7 @@ async function getLobeIconsList(forceRefresh = false, retries = 2) {
         timeout: 30000,  // 增加超时到 30 秒
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'nav-site-icon-fetcher'
+          'User-Agent': 'nooknav-icon-fetcher'
         }
       }
     );

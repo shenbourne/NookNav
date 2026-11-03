@@ -16,6 +16,9 @@ const {
   verifySessionToken,
 } = require('./services/security');
 
+const { getAppInfo, checkForUpdates } = require('./services/app-info');
+const appInfo = getAppInfo();
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 // NAV_DATA_DIR 允许把数据目录放到仓库之外（测试 / 自定义部署时使用）
@@ -506,6 +509,18 @@ app.post('/api/fetch-meta', authMiddleware, async (req, res) => {
   }
 });
 
+// Application identity and explicit, authenticated release checks.
+app.get('/api/app-info', authMiddleware, (req, res) => {
+  res.json({ success: true, data: appInfo });
+});
+app.get('/api/app-info/updates', authMiddleware, async (req, res) => {
+  try {
+    res.json({ success: true, data: await checkForUpdates(appInfo.version) });
+  } catch {
+    res.status(502).json({ success: false, error: '无法检查更新，请稍后重试（网络异常或 GitHub 请求受限）' });
+  }
+});
+
 // --- Icon matching routes ---
 
 app.post('/api/match-icons', authMiddleware, async (req, res) => {
@@ -556,7 +571,7 @@ if (fs.existsSync(publicDir)) {
 
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Nav-site backend running on http://localhost:${PORT}`);
+    console.log(`NookNav backend running on http://localhost:${PORT}`);
   });
 }
 

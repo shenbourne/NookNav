@@ -1,5 +1,5 @@
 /**
- * DataStore — Nav-Site 数据持久化层。
+ * DataStore — NookNav 数据持久化层。
  *
  * 封装所有 JSON 文件 I/O，为路由处理器提供一个深度接口：
  * 调用方只关心「做什么」（创建/更新/删除），不关心内部查找/排序/写回。
@@ -64,7 +64,7 @@ class DataStore {
   #initDataFile() {
     if (!fs.existsSync(this.DATA_FILE)) {
       const defaultData = {
-        siteSettings: { title: 'My Nav 的主页', logoUrl: '' },
+        siteSettings: { title: 'NookNav 的主页', logoUrl: '' },
         categories: [{ id: 'cat_001', name: '全部', icon: '📋', order: 0 }],
       };
       this.#writeData(defaultData);
@@ -548,7 +548,7 @@ class DataStore {
   // ---------- public: Settings ----------
 
   static DEFAULT_SETTINGS = {
-    title: 'My Nav 的主页',
+    title: 'NookNav 的主页',
     logoUrl: '',
     githubJsdelivr: false,
     localIcons: true,

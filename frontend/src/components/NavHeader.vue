@@ -2,7 +2,7 @@
   <header class="nav-header">
     <div class="header-title">
       <img class="header-logo" :src="navStore.accelerateUrl(navStore.siteSettings.logoUrl) || '/navsite-logo.png'" alt="Logo" />
-      <span>{{ navStore.siteSettings.title || 'My Nav 的主页' }}</span>
+      <span>{{ navStore.siteSettings.title || 'NookNav 的主页' }}</span>
     </div>
     <div class="header-actions">
       <!-- Theme toggle -->

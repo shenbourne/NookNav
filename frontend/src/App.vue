@@ -104,7 +104,7 @@
 
       <div v-else class="empty-state">
         <div class="empty-icon">🧭</div>
-        <h2>欢迎使用 My Nav</h2>
+        <h2>欢迎使用 NookNav</h2>
         <p>点击右上角"管理后台"开始添加分类和链接</p>
       </div>
     </main>
@@ -233,7 +233,7 @@ onMounted(() => {
 })
 
 watchEffect(() => {
-  document.title = store.siteSettings.title || 'My Nav 的主页'
+  document.title = store.siteSettings.title || 'NookNav 的主页'
 
   const link = document.querySelector("link[rel~='icon']")
   if (link) {

@@ -1,6 +1,6 @@
 services:
   nav-site:
-    image: "shenbourne/nav-site:latest"
+    image: "shenbourne/nook-nav:latest"
     ports:
       - "3000:3000"
     volumes:

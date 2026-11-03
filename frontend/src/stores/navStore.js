@@ -4,12 +4,47 @@ import { useAuthStore } from './authStore.js'
 import api from '../composables/useApi.js'
 
 export const useNavStore = defineStore('nav', () => {
+  const appInfo = ref(null)
+  const updateInfo = ref(null)
+  const checkingUpdates = ref(false)
+  const appInfoError = ref('')
+  let appInfoRequest = null
+  async function fetchAppInfo() {
+    if (appInfoRequest) return appInfoRequest
+    appInfoError.value = ''
+    appInfoRequest = (async () => {
+      try {
+        const { data: res } = await api.get('/app-info')
+        if (!res.success) throw new Error(res.error)
+        appInfo.value = res.data
+      } catch {
+        appInfoError.value = '无法读取应用信息，请重试'
+      } finally { appInfoRequest = null }
+    })()
+    return appInfoRequest
+  }
+  async function checkAppUpdates() {
+    if (checkingUpdates.value) return
+    checkingUpdates.value = true
+    appInfoError.value = ''
+    updateInfo.value = null
+    try {
+      if (!appInfo.value) await fetchAppInfo()
+      if (!appInfo.value) return
+      const { data: res } = await api.get('/app-info/updates')
+      if (!res.success) throw new Error(res.error)
+      updateInfo.value = res.data
+    } catch (error) {
+      appInfoError.value = error.response?.data?.error || '无法检查更新，请稍后重试'
+    } finally { checkingUpdates.value = false }
+  }
+
   const categories = ref([])
   const loading = ref(false)
   const activeTabId = ref('')
   const searchQuery = ref('')
   const siteSettings = ref({
-    title: 'My Nav 的主页',
+    title: 'NookNav 的主页',
     logoUrl: '',
     githubJsdelivr: false,
     localIcons: true,
@@ -405,6 +440,7 @@ export const useNavStore = defineStore('nav', () => {
   }
 
   return {
+    appInfo, updateInfo, checkingUpdates, appInfoError, fetchAppInfo, checkAppUpdates,
     categories,
     loading,
     activeTabId,
